@@ -148,10 +148,23 @@ public class AppConfig
                 ReadCommentHandling = JsonCommentHandling.Skip
             };
             var config = JsonSerializer.Deserialize<AppConfig>(json, options) ?? new AppConfig();
+            bool needsSave = false;
 
             if (config.Tasks == null || config.Tasks.Count == 0)
             {
                 config.Tasks = CreateDefaultTasks();
+                needsSave = true;
+            }
+
+            // Açık metin şifre girilmişse hemen otomatik şifrele ve kaydet
+            if (!string.IsNullOrEmpty(config.Database.Password) && !SecurityHelper.IsEncrypted(config.Database.Password))
+            {
+                config.Database.Password = SecurityHelper.Protect(config.Database.Password);
+                needsSave = true;
+            }
+
+            if (needsSave)
+            {
                 Save(filePath, config);
             }
 

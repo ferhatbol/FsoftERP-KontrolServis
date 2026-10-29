@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using FsoftERP.KontrolServis.Configuration;
+using FsoftERP.KontrolServis.Security;
 using FsoftERP.KontrolServis.Services;
 using FsoftERP.KontrolServis.UI;
 using Microsoft.Extensions.DependencyInjection;
@@ -115,19 +116,30 @@ internal static class Program
             return res.Success ? 0 : 1;
         }
 
+        var encryptArg = args.FirstOrDefault(a => a.StartsWith("--encrypt-password=", StringComparison.OrdinalIgnoreCase));
+        if (encryptArg != null)
+        {
+            string plain = encryptArg.Substring("--encrypt-password=".Length);
+            string encrypted = SecurityHelper.Protect(plain);
+            Console.WriteLine($"Şifreli Değer: {encrypted}");
+            Console.WriteLine("Bu değeri appsettings.json dosyasındaki Database.Password alanına doğrudan yapıştırabilirsiniz.");
+            return 0;
+        }
+
         if (args.Contains("--help", StringComparer.OrdinalIgnoreCase) || args.Contains("-h", StringComparer.OrdinalIgnoreCase))
         {
-            string ver = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.4.0";
+            string ver = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.5.0";
             Console.WriteLine($"FsoftERP Kontrol Servisi (FsoftERPSKWS) v{ver}");
             Console.WriteLine("Kullanım:");
-            Console.WriteLine("  FsoftERPSKWS.exe                     : Görsel Ayar ve Yönetim Panelini açar (GUI)");
-            Console.WriteLine("  FsoftERPSKWS.exe --service           : Windows Servis modunda arka planda çalıştırır");
-            Console.WriteLine("  FsoftERPSKWS.exe --install           : Windows Servisini sisteme otomatik başlangıçlı kurar");
-            Console.WriteLine("  FsoftERPSKWS.exe --uninstall         : Windows Servisini sistemden kaldırır");
-            Console.WriteLine("  FsoftERPSKWS.exe --start             : Windows Servisini başlatır");
-            Console.WriteLine("  FsoftERPSKWS.exe --stop              : Windows Servisini durdurur");
-            Console.WriteLine("  FsoftERPSKWS.exe --run-all           : Aktif tüm Stored Procedure'leri hemen çalıştırır");
-            Console.WriteLine("  FsoftERPSKWS.exe --run-sp=<SP_ADI>   : Belirtilen Stored Procedure'ü hemen çalıştırır");
+            Console.WriteLine("  FsoftERPSKWS.exe                         : Görsel Ayar ve Yönetim Panelini açar (GUI)");
+            Console.WriteLine("  FsoftERPSKWS.exe --service               : Windows Servis modunda arka planda çalıştırır");
+            Console.WriteLine("  FsoftERPSKWS.exe --install               : Windows Servisini sisteme otomatik başlangıçlı kurar");
+            Console.WriteLine("  FsoftERPSKWS.exe --uninstall             : Windows Servisini sistemden kaldırır");
+            Console.WriteLine("  FsoftERPSKWS.exe --start                 : Windows Servisini başlatır");
+            Console.WriteLine("  FsoftERPSKWS.exe --stop                  : Windows Servisini durdurur");
+            Console.WriteLine("  FsoftERPSKWS.exe --run-all               : Aktif tüm Stored Procedure'leri hemen çalıştırır");
+            Console.WriteLine("  FsoftERPSKWS.exe --run-sp=<SP_ADI>       : Belirtilen Stored Procedure'ü hemen çalıştırır");
+            Console.WriteLine("  FsoftERPSKWS.exe --encrypt-password=SIFRE : Veritabanı şifresini AES-256 ile şifreler");
             return 0;
         }
 
