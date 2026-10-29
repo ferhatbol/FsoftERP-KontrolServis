@@ -376,6 +376,20 @@ public class TaskEditDialog : Form
 
         _dgvParams.Columns.AddRange(colParamName, colState, colType, colVal);
 
+        _dgvParams.DataError += (s, e) =>
+        {
+            e.ThrowException = false;
+        };
+
+        _dgvParams.EditingControlShowing += (s, e) =>
+        {
+            if (e.Control is ComboBox cb)
+            {
+                cb.AutoCompleteMode = AutoCompleteMode.None;
+                cb.DropDownStyle = ComboBoxStyle.DropDownList;
+            }
+        };
+
         _dgvParams.CellValueChanged += (s, e) =>
         {
             if (e.RowIndex >= 0)

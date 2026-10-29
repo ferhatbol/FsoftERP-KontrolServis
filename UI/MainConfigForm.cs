@@ -355,6 +355,7 @@ public class MainConfigForm : Form
         };
 
         _dgvTasks.Columns.AddRange(colEnabled, colName, colProc, colParams, colSchedule, colTimeout);
+        _dgvTasks.DataError += (s, e) => { e.ThrowException = false; };
         _dgvTasks.CellDoubleClick += (s, e) =>
         {
             if (e.RowIndex >= 0) OnEditTaskClick(s, e);

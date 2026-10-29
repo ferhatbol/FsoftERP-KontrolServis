@@ -14,7 +14,7 @@ internal static class Program
     private const int ATTACH_PARENT_PROCESS = -1;
 
     [STAThread]
-    private static async Task<int> Main(string[] args)
+    private static int Main(string[] args)
     {
         var config = AppConfig.Load();
         AppLogger.Initialize(config.Logging.LogDirectory);
@@ -32,7 +32,7 @@ internal static class Program
                 builder.Services.AddHostedService<KontrolBackgroundService>();
 
                 var host = builder.Build();
-                await host.RunAsync();
+                host.Run();
                 return 0;
             }
             catch (Exception ex)
@@ -95,7 +95,7 @@ internal static class Program
             foreach (var task in config.Tasks.Where(t => t.Enabled))
             {
                 Console.WriteLine($"-> {task.ProcedureName}...");
-                var res = await sql.ExecuteTaskAsync(task);
+                var res = sql.ExecuteTaskAsync(task).GetAwaiter().GetResult();
                 Console.WriteLine($"   {res.Message}");
             }
             return 0;
@@ -110,14 +110,14 @@ internal static class Program
 
             Console.WriteLine($"{spName} stored procedure çalıştırılıyor...");
             var sql = new SqlService(config);
-            var res = await sql.ExecuteTaskAsync(task);
+            var res = sql.ExecuteTaskAsync(task).GetAwaiter().GetResult();
             Console.WriteLine(res.Message);
             return res.Success ? 0 : 1;
         }
 
         if (args.Contains("--help", StringComparer.OrdinalIgnoreCase) || args.Contains("-h", StringComparer.OrdinalIgnoreCase))
         {
-            Console.WriteLine("FsoftERP Kontrol Servisi (FsoftERPSKWS) v1.0.1.0");
+            Console.WriteLine("FsoftERP Kontrol Servisi (FsoftERPSKWS) v1.0.3.0");
             Console.WriteLine("Kullanım:");
             Console.WriteLine("  FsoftERPSKWS.exe                     : Görsel Ayar ve Yönetim Panelini açar (GUI)");
             Console.WriteLine("  FsoftERPSKWS.exe --service           : Windows Servis modunda arka planda çalıştırır");
