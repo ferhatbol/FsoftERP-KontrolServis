@@ -64,7 +64,7 @@ public class MainConfigForm : Form
 
     private void InitializeComponent()
     {
-        Text = "FsoftERP Kontrol Servisi - Stored Procedure Otomasyon ve Yönetim Paneli (v1.0.1.0)";
+        Text = "FsoftERP Kontrol Servisi - Stored Procedure Otomasyon ve Yönetim Paneli (v1.0.2.0)";
         Size = new Size(1020, 760);
         MinimumSize = new Size(920, 640);
         StartPosition = FormStartPosition.CenterScreen;
@@ -174,7 +174,7 @@ public class MainConfigForm : Form
 
         var lblSub = new Label
         {
-            Text = "Dinamik Stored Procedure Otomasyon Motoru | FsoftERPSKWS v1.0.1.0",
+            Text = "Dinamik Stored Procedure Otomasyon Motoru | FsoftERPSKWS v1.0.2.0",
             Font = new Font("Segoe UI", 8.75f, FontStyle.Regular),
             ForeColor = Color.FromArgb(148, 163, 184),
             Location = new Point(156, 36),
@@ -325,7 +325,15 @@ public class MainConfigForm : Form
             HeaderText = "Stored Procedure",
             Name = "colProc",
             ReadOnly = true,
-            FillWeight = 30f
+            FillWeight = 25f
+        };
+
+        var colParams = new DataGridViewTextBoxColumn
+        {
+            HeaderText = "Parametreler",
+            Name = "colParams",
+            ReadOnly = true,
+            FillWeight = 25f
         };
 
         var colSchedule = new DataGridViewTextBoxColumn
@@ -333,7 +341,7 @@ public class MainConfigForm : Form
             HeaderText = "Çalışma Planı (Zamanlama)",
             Name = "colSchedule",
             ReadOnly = true,
-            FillWeight = 30f
+            FillWeight = 25f
         };
 
         var colTimeout = new DataGridViewTextBoxColumn
@@ -345,7 +353,7 @@ public class MainConfigForm : Form
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None
         };
 
-        _dgvTasks.Columns.AddRange(colEnabled, colName, colProc, colSchedule, colTimeout);
+        _dgvTasks.Columns.AddRange(colEnabled, colName, colProc, colParams, colSchedule, colTimeout);
         _dgvTasks.CellDoubleClick += (s, e) =>
         {
             if (e.RowIndex >= 0) OnEditTaskClick(s, e);
@@ -728,6 +736,7 @@ public class MainConfigForm : Form
                 task.Enabled,
                 task.Name,
                 task.ProcedureName,
+                task.GetParametersSummary(),
                 task.GetScheduleSummary(),
                 task.CommandTimeoutSeconds
             );

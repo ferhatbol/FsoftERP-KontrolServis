@@ -12,10 +12,48 @@ public enum SpScheduleType
     IntervalMinutes = 1   // Belirli Dakika Aralıklarında (Örn: 3 dakikada bir)
 }
 
+public enum SpParamType
+{
+    String = 0,      // Metin (VarChar)
+    Int = 1,         // Tamsayı (Int)
+    Decimal = 2,     // Ondalıklı Sayı (Decimal)
+    Boolean = 3,     // Bit / Mantıksal (True/False - 1/0)
+    DateTime = 4     // Tarih / Saat (DateTime)
+}
+
 public class SpParameterConfig
 {
     public string Name { get; set; } = "";
-    public string? Value { get; set; } = null; // null veya boş ise DBNull olarak iletilir
+    public bool IsNull { get; set; } = true; // true ise doğrudan NULL (DBNull.Value) atanır
+    public SpParamType DataType { get; set; } = SpParamType.String;
+    public string? Value { get; set; } = null; // Sabit değer (IsNull false ise kullanılır)
+
+    public string GetDisplaySummary()
+    {
+        string pName = string.IsNullOrWhiteSpace(Name) ? "@Param" : (Name.StartsWith("@") ? Name : "@" + Name);
+        if (IsNull)
+        {
+            return $"{pName} = NULL";
+        }
+
+        if (DataType == SpParamType.String || DataType == SpParamType.DateTime)
+        {
+            return $"{pName} = '{Value}'";
+        }
+
+        return $"{pName} = {Value}";
+    }
+
+    public SpParameterConfig Clone()
+    {
+        return new SpParameterConfig
+        {
+            Name = Name,
+            IsNull = IsNull,
+            DataType = DataType,
+            Value = Value
+        };
+    }
 }
 
 public class SpTaskConfig
@@ -52,6 +90,19 @@ public class SpTaskConfig
         }
     }
 
+    public string GetParametersSummary()
+    {
+        if (Parameters == null || Parameters.Count == 0) return "(Parametresiz)";
+        return string.Join(", ", Parameters.Select(p => p.GetDisplaySummary()));
+    }
+
+    public string GetSqlPreview()
+    {
+        string sp = string.IsNullOrWhiteSpace(ProcedureName) ? "SP_ADI" : ProcedureName;
+        if (Parameters == null || Parameters.Count == 0) return $"EXEC {sp}";
+        return $"EXEC {sp} {string.Join(", ", Parameters.Select(p => p.GetDisplaySummary()))}";
+    }
+
     public SpTaskConfig Clone()
     {
         return new SpTaskConfig
@@ -63,7 +114,7 @@ public class SpTaskConfig
             ScheduleType = ScheduleType,
             IntervalMinutes = IntervalMinutes,
             ExecutionTimes = new List<string>(ExecutionTimes),
-            Parameters = Parameters.Select(p => new SpParameterConfig { Name = p.Name, Value = p.Value }).ToList(),
+            Parameters = Parameters.Select(p => p.Clone()).ToList(),
             CommandTimeoutSeconds = CommandTimeoutSeconds
         };
     }
@@ -98,7 +149,6 @@ public class AppConfig
             };
             var config = JsonSerializer.Deserialize<AppConfig>(json, options) ?? new AppConfig();
 
-            // Eğer listede görev yoksa varsayılanları ekle
             if (config.Tasks == null || config.Tasks.Count == 0)
             {
                 config.Tasks = CreateDefaultTasks();
@@ -122,7 +172,6 @@ public class AppConfig
             Directory.CreateDirectory(dir);
         }
 
-        // Şifreyi kaydederken DPAPI ile koru
         if (!string.IsNullOrEmpty(config.Database.Password) && !SecurityHelper.IsEncrypted(config.Database.Password))
         {
             config.Database.Password = SecurityHelper.Protect(config.Database.Password);
@@ -163,6 +212,7 @@ public class AppConfig
                 Enabled = true,
                 ScheduleType = SpScheduleType.SpecificTimes,
                 ExecutionTimes = new List<string> { "12:00", "19:00" },
+                Parameters = new List<SpParameterConfig>(),
                 CommandTimeoutSeconds = 1000
             },
             new SpTaskConfig
@@ -175,7 +225,7 @@ public class AppConfig
                 IntervalMinutes = 3,
                 Parameters = new List<SpParameterConfig>
                 {
-                    new SpParameterConfig { Name = "@SiparisNo", Value = null }
+                    new SpParameterConfig { Name = "@SiparisNo", IsNull = true, DataType = SpParamType.String, Value = null }
                 },
                 CommandTimeoutSeconds = 1000
             },
@@ -187,6 +237,7 @@ public class AppConfig
                 Enabled = true,
                 ScheduleType = SpScheduleType.SpecificTimes,
                 ExecutionTimes = new List<string> { "12:00" },
+                Parameters = new List<SpParameterConfig>(),
                 CommandTimeoutSeconds = 1000
             }
         };
