@@ -807,9 +807,12 @@ public class MainConfigForm : Form
 
         var task = _config.Tasks[idx];
         var cloned = task.Clone();
+        cloned.Name = string.IsNullOrWhiteSpace(task.Name)
+            ? $"{task.ProcedureName} (Kopya)"
+            : $"{task.Name} (Kopya)";
         _config.Tasks.Insert(idx + 1, cloned);
         RefreshTasksGrid();
-        _lblStatus.Text = $"Görev klonlandı: {cloned.ProcedureName}";
+        _lblStatus.Text = $"Görev klonlandı: {cloned.Name} (Kaydetmeyi unutmayınız)";
     }
 
     private async Task OnRunTaskNowClick()

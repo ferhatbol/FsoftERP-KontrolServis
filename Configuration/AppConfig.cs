@@ -108,7 +108,7 @@ public class SpTaskConfig
         return new SpTaskConfig
         {
             Id = Guid.NewGuid().ToString("N"),
-            Name = Name + " (Kopya)",
+            Name = Name,
             ProcedureName = ProcedureName,
             Enabled = Enabled,
             ScheduleType = ScheduleType,
