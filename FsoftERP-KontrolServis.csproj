@@ -9,6 +9,7 @@
     <AssemblyName>FsoftERPSKWS</AssemblyName>
     <RootNamespace>FsoftERP.KontrolServis</RootNamespace>
     <ApplicationIcon>Resources\fsoft.ico</ApplicationIcon>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
 
     <!-- Assembly Metadata -->
     <Version>1.0.4.0</Version>
