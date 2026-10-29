@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>FsoftERPSKWS</AssemblyName>
+    <RootNamespace>FsoftERP.KontrolServis</RootNamespace>
+    <ApplicationIcon>Resources\fsoft.ico</ApplicationIcon>
+
+    <!-- Assembly Metadata -->
+    <Version>1.0.0.1</Version>
+    <AssemblyVersion>1.0.0.1</AssemblyVersion>
+    <FileVersion>1.0.0.1</FileVersion>
+    <Company>Fsoft</Company>
+    <Product>FsoftERP Kontrol Servisi</Product>
+    <Authors>Ferhat BOL</Authors>
+    <Copyright>© 2026 Fsoft. Tüm hakları saklıdır.</Copyright>
+    <Description>FsoftERP Depo Stok Tarihçe ve Sipariş Durum Kontrol Windows Servisi</Description>
+    <NeutralLanguage>tr-TR</NeutralLanguage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.2" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Resources\fsoft.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\fsoft_logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\fsoft_icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
