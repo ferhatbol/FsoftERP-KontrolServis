@@ -22,8 +22,9 @@ public class KontrolBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        string version = typeof(KontrolBackgroundService).Assembly.GetName().Version?.ToString() ?? "1.0.3.0";
         AppLogger.Info("=================================================");
-        AppLogger.Info("FsoftERP Kontrol Servisi (FsoftERPSKWS) Başlatıldı. v1.0.1.0");
+        AppLogger.Info($"FsoftERP Kontrol Servisi (FsoftERPSKWS) Başlatıldı. v{version}");
         AppLogger.Info($"Veritabanı: {_config.Database.Server} / {_config.Database.Database}");
         AppLogger.Info($"Tanımlı Toplam SP Görev Sayısı: {_config.Tasks.Count}");
         foreach (var t in _config.Tasks)

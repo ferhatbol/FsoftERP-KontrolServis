@@ -1,10 +1,12 @@
 using FsoftERP.KontrolServis.Configuration;
+using FsoftERP.KontrolServis.Services;
 
 namespace FsoftERP.KontrolServis.UI;
 
 public class TaskEditDialog : Form
 {
     private readonly SpTaskConfig _task;
+    private readonly SqlService? _sqlService;
 
     private TextBox _txtName = null!;
     private TextBox _txtProcedure = null!;
@@ -32,6 +34,7 @@ public class TaskEditDialog : Form
     private Button _btnAddNullParam = null!;
     private Button _btnAddValueParam = null!;
     private Button _btnRemoveParam = null!;
+    private Button _btnFetchParams = null!;
     private Label _lblSqlPreview = null!;
 
     // Timeout
@@ -39,9 +42,10 @@ public class TaskEditDialog : Form
 
     public SpTaskConfig ResultTask => _task;
 
-    public TaskEditDialog(SpTaskConfig? existingTask = null)
+    public TaskEditDialog(SpTaskConfig? existingTask = null, SqlService? sqlService = null)
     {
         _task = existingTask?.Clone() ?? new SpTaskConfig();
+        _sqlService = sqlService;
 
         InitializeComponent();
         LoadTaskToUi();
@@ -96,9 +100,24 @@ public class TaskEditDialog : Form
         // 2. Procedure Name
         top += 38;
         var lblProc = new Label { Text = "Stored Procedure Adı:", Location = new Point(leftLabel, top + 3), AutoSize = true, Font = new Font("Segoe UI", 9.25f, FontStyle.Bold) };
-        _txtProcedure = new TextBox { Location = new Point(leftCtrl, top), Size = new Size(widthCtrl, 26), Font = new Font("Consolas", 10f, FontStyle.Bold) };
+        _txtProcedure = new TextBox { Location = new Point(leftCtrl, top), Size = new Size(325, 26), Font = new Font("Consolas", 10f, FontStyle.Bold) };
         _txtProcedure.TextChanged += (s, e) => UpdateSqlPreview();
-        pnlContent.Controls.AddRange(new Control[] { lblProc, _txtProcedure });
+
+        _btnFetchParams = new Button
+        {
+            Text = "🔍 Parametreleri SQL'den Çek",
+            Location = new Point(leftCtrl + 335, top - 1),
+            Size = new Size(165, 28),
+            Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+            BackColor = Color.FromArgb(238, 242, 255),
+            ForeColor = Color.FromArgb(79, 70, 229),
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
+        };
+        _btnFetchParams.FlatAppearance.BorderColor = Color.FromArgb(199, 210, 254);
+        _btnFetchParams.Click += async (s, e) => await OnFetchParamsClickAsync();
+
+        pnlContent.Controls.AddRange(new Control[] { lblProc, _txtProcedure, _btnFetchParams });
 
         // 3. Enabled Checkbox
         top += 38;
@@ -605,5 +624,78 @@ public class TaskEditDialog : Form
 
         DialogResult = DialogResult.OK;
         Close();
+    }
+
+    private async Task OnFetchParamsClickAsync()
+    {
+        string spName = _txtProcedure.Text.Trim();
+        if (string.IsNullOrWhiteSpace(spName))
+        {
+            MessageBox.Show(this, "Lütfen önce Stored Procedure adını yazınız.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _txtProcedure.Focus();
+            return;
+        }
+
+        if (_sqlService == null)
+        {
+            MessageBox.Show(this, "Veritabanı servisi hazır değil.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        _btnFetchParams.Enabled = false;
+        _btnFetchParams.Text = "⏳ Aranıyor...";
+        Cursor = Cursors.WaitCursor;
+
+        try
+        {
+            var detectedParams = await _sqlService.GetSpParametersAsync(spName);
+
+            if (detectedParams.Count == 0)
+            {
+                MessageBox.Show(this, $"'{spName}' için SQL Server'da parametre bulunamadı veya prosedür parametresiz.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var sbSummary = new System.Text.StringBuilder();
+            sbSummary.AppendLine($"'{spName}' için veritabanında {detectedParams.Count} adet parametre tespit edildi:\n");
+            foreach (var p in detectedParams)
+            {
+                sbSummary.AppendLine($"  • {p.Name} ({p.DataType})");
+            }
+            sbSummary.AppendLine("\nBu parametreler listeye eklensin mi?");
+
+            var ans = MessageBox.Show(this, sbSummary.ToString(), "Parametreler Bulundu", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans == DialogResult.Yes)
+            {
+                _dgvParams.Rows.Clear();
+                foreach (var p in detectedParams)
+                {
+                    string typeDisplay = p.DataType switch
+                    {
+                        SpParamType.Int => "Tamsayı (Int)",
+                        SpParamType.Decimal => "Ondalıklı (Decimal)",
+                        SpParamType.Boolean => "Mantıksal (Bit)",
+                        SpParamType.DateTime => "Tarih (DateTime)",
+                        _ => "Metin (String)"
+                    };
+
+                    int rowIdx = _dgvParams.Rows.Add(p.Name, "NULL", typeDisplay, "(NULL)");
+                    _dgvParams.Rows[rowIdx].Cells[3].ReadOnly = true;
+                    _dgvParams.Rows[rowIdx].Cells[3].Style.BackColor = Color.FromArgb(241, 245, 249);
+                }
+
+                UpdateSqlPreview();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Parametreler SQL'den çekilirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _btnFetchParams.Enabled = true;
+            _btnFetchParams.Text = "🔍 Parametreleri SQL'den Çek";
+            Cursor = Cursors.Default;
+        }
     }
 }

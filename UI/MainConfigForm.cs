@@ -59,12 +59,12 @@ public class MainConfigForm : Form
         UpdateServiceStatus();
 
         AppLogger.OnLogMessage += AppendLogMessage;
-        AppLogger.Info("FsoftERP Kontrol Servisi Yönetim Paneli açıldı. v1.0.1.0");
+        AppLogger.Info("FsoftERP Kontrol Servisi Yönetim Paneli açıldı. v1.0.3.0");
     }
 
     private void InitializeComponent()
     {
-        Text = "FsoftERP Kontrol Servisi - Stored Procedure Otomasyon ve Yönetim Paneli (v1.0.2.0)";
+        Text = "FsoftERP Kontrol Servisi - Stored Procedure Otomasyon ve Yönetim Paneli (v1.0.3.0)";
         Size = new Size(1020, 760);
         MinimumSize = new Size(920, 640);
         StartPosition = FormStartPosition.CenterScreen;
@@ -172,9 +172,10 @@ public class MainConfigForm : Form
             AutoSize = true
         };
 
+        string version = GetType().Assembly.GetName().Version?.ToString() ?? "1.0.3.0";
         var lblSub = new Label
         {
-            Text = "Dinamik Stored Procedure Otomasyon Motoru | FsoftERPSKWS v1.0.2.0",
+            Text = $"Dinamik Stored Procedure Otomasyon Motoru | FsoftERPSKWS v{version}",
             Font = new Font("Segoe UI", 8.75f, FontStyle.Regular),
             ForeColor = Color.FromArgb(148, 163, 184),
             Location = new Point(156, 36),
@@ -751,7 +752,7 @@ public class MainConfigForm : Form
 
     private void OnAddTaskClick(object? sender, EventArgs e)
     {
-        using var dlg = new TaskEditDialog();
+        using var dlg = new TaskEditDialog(null, _sqlService);
         if (dlg.ShowDialog(this) == DialogResult.OK)
         {
             _config.Tasks.Add(dlg.ResultTask);
@@ -767,7 +768,7 @@ public class MainConfigForm : Form
         if (idx < 0 || idx >= _config.Tasks.Count) return;
 
         var task = _config.Tasks[idx];
-        using var dlg = new TaskEditDialog(task);
+        using var dlg = new TaskEditDialog(task, _sqlService);
         if (dlg.ShowDialog(this) == DialogResult.OK)
         {
             _config.Tasks[idx] = dlg.ResultTask;

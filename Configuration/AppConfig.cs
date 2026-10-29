@@ -225,7 +225,7 @@ public class AppConfig
                 IntervalMinutes = 3,
                 Parameters = new List<SpParameterConfig>
                 {
-                    new SpParameterConfig { Name = "@SiparisNo", IsNull = true, DataType = SpParamType.String, Value = null }
+                    new SpParameterConfig { Name = "@SiparisId", IsNull = true, DataType = SpParamType.Int, Value = null }
                 },
                 CommandTimeoutSeconds = 1000
             },
