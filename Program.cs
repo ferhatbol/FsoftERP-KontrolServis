@@ -117,7 +117,8 @@ internal static class Program
 
         if (args.Contains("--help", StringComparer.OrdinalIgnoreCase) || args.Contains("-h", StringComparer.OrdinalIgnoreCase))
         {
-            Console.WriteLine("FsoftERP Kontrol Servisi (FsoftERPSKWS) v1.0.3.0");
+            string ver = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.4.0";
+            Console.WriteLine($"FsoftERP Kontrol Servisi (FsoftERPSKWS) v{ver}");
             Console.WriteLine("Kullanım:");
             Console.WriteLine("  FsoftERPSKWS.exe                     : Görsel Ayar ve Yönetim Panelini açar (GUI)");
             Console.WriteLine("  FsoftERPSKWS.exe --service           : Windows Servis modunda arka planda çalıştırır");
