@@ -43,11 +43,18 @@ public class SqlService
         }
     }
 
-    public async Task<(bool Success, string Message, TimeSpan Duration)> ExecuteDepoStokTarihceAsync(CancellationToken cancellationToken = default)
+    public async Task<(bool Success, string Message, TimeSpan Duration)> ExecuteTaskAsync(SpTaskConfig task, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(task.ProcedureName))
+        {
+            return (false, "Stored Procedure adı belirtilmemiş!", TimeSpan.Zero);
+        }
+
         var sw = Stopwatch.StartNew();
-        string procName = "Sp_Set_DepoStokTarihce";
-        AppLogger.Info($"[BAŞLADI] {procName} çalıştırılıyor...");
+        string spName = task.ProcedureName.Trim();
+        string taskDisplayName = string.IsNullOrWhiteSpace(task.Name) ? spName : task.Name;
+
+        AppLogger.Info($"[BAŞLADI] Görev: '{taskDisplayName}' ({spName}) çalıştırılıyor...");
 
         try
         {
@@ -55,68 +62,52 @@ public class SqlService
             await using var conn = new SqlConnection(conStr);
             await conn.OpenAsync(cancellationToken);
 
-            await using var cmd = new SqlCommand(procName, conn)
+            await using var cmd = new SqlCommand(spName, conn)
             {
                 CommandType = CommandType.StoredProcedure,
-                CommandTimeout = _config.DepoStokTarihce.CommandTimeoutSeconds
+                CommandTimeout = Math.Max(10, task.CommandTimeoutSeconds)
             };
+
+            // Parametreleri ekle
+            if (task.Parameters != null && task.Parameters.Count > 0)
+            {
+                foreach (var p in task.Parameters)
+                {
+                    if (string.IsNullOrWhiteSpace(p.Name)) continue;
+                    string pName = p.Name.Trim();
+                    if (!pName.StartsWith("@")) pName = "@" + pName;
+
+                    var sqlParam = cmd.Parameters.Add(pName, SqlDbType.VarChar);
+                    if (string.IsNullOrWhiteSpace(p.Value) || string.Equals(p.Value, "NULL", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sqlParam.Value = DBNull.Value;
+                    }
+                    else
+                    {
+                        sqlParam.Value = p.Value.Trim();
+                    }
+                }
+            }
 
             int rowsAffected = await cmd.ExecuteNonQueryAsync(cancellationToken);
             sw.Stop();
 
-            string msg = $"{procName} başarıyla tamamlandı. (Süre: {sw.ElapsedMilliseconds} ms, Etkilenen Satır: {rowsAffected})";
+            task.LastRunTime = DateTime.Now;
+            task.LastRunStatus = "Başarılı";
+            task.LastRunDuration = sw.Elapsed;
+
+            string msg = $"'{taskDisplayName}' ({spName}) başarıyla tamamlandı. (Süre: {sw.ElapsedMilliseconds} ms, Etkilenen Satır: {rowsAffected})";
             AppLogger.Success($"[TAMAMLANDI] {msg}");
             return (true, msg, sw.Elapsed);
         }
         catch (Exception ex)
         {
             sw.Stop();
-            string errorMsg = $"{procName} çalıştırılırken hata: {ex.Message}";
-            AppLogger.Error(errorMsg, ex);
-            return (false, errorMsg, sw.Elapsed);
-        }
-    }
+            task.LastRunTime = DateTime.Now;
+            task.LastRunStatus = $"Hata: {ex.Message}";
+            task.LastRunDuration = sw.Elapsed;
 
-    public async Task<(bool Success, string Message, TimeSpan Duration)> ExecuteSparisDurumKontrolAsync(CancellationToken cancellationToken = default)
-    {
-        var sw = Stopwatch.StartNew();
-        string procName = "Sp_Set_SparisDurumKontrol";
-        string? siparisNo = _config.SparisDurumKontrol.SiparisNo;
-        AppLogger.Info($"[BAŞLADI] {procName} çalıştırılıyor... (SiparisNo: {(string.IsNullOrEmpty(siparisNo) ? "TÜMÜ / NULL" : siparisNo)})");
-
-        try
-        {
-            string conStr = _config.Database.BuildConnectionString();
-            await using var conn = new SqlConnection(conStr);
-            await conn.OpenAsync(cancellationToken);
-
-            await using var cmd = new SqlCommand(procName, conn)
-            {
-                CommandType = CommandType.StoredProcedure,
-                CommandTimeout = _config.SparisDurumKontrol.CommandTimeoutSeconds
-            };
-
-            var pSiparis = cmd.Parameters.Add("@SiparisNo", SqlDbType.VarChar);
-            if (string.IsNullOrWhiteSpace(siparisNo))
-            {
-                pSiparis.Value = DBNull.Value;
-            }
-            else
-            {
-                pSiparis.Value = siparisNo.Trim();
-            }
-
-            int rowsAffected = await cmd.ExecuteNonQueryAsync(cancellationToken);
-            sw.Stop();
-
-            string msg = $"{procName} başarıyla tamamlandı. (Süre: {sw.ElapsedMilliseconds} ms, Etkilenen Satır: {rowsAffected})";
-            AppLogger.Success($"[TAMAMLANDI] {msg}");
-            return (true, msg, sw.Elapsed);
-        }
-        catch (Exception ex)
-        {
-            sw.Stop();
-            string errorMsg = $"{procName} çalıştırılırken hata: {ex.Message}";
+            string errorMsg = $"'{taskDisplayName}' ({spName}) çalıştırılırken hata oluştu: {ex.Message}";
             AppLogger.Error(errorMsg, ex);
             return (false, errorMsg, sw.Elapsed);
         }

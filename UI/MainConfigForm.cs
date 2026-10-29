@@ -12,7 +12,17 @@ public class MainConfigForm : Form
     // Header Controls
     private Button _btnHeaderSave = null!;
 
-    // Tab 1: Database
+    // Tab 1: Dynamic Tasks Grid
+    private DataGridView _dgvTasks = null!;
+    private Button _btnAddTask = null!;
+    private Button _btnEditTask = null!;
+    private Button _btnDeleteTask = null!;
+    private Button _btnCloneTask = null!;
+    private Button _btnRunTaskNow = null!;
+    private Button _btnMoveUp = null!;
+    private Button _btnMoveDown = null!;
+
+    // Tab 2: Database
     private TextBox _txtServer = null!;
     private TextBox _txtDatabase = null!;
     private CheckBox _chkWindowsAuth = null!;
@@ -23,26 +33,7 @@ public class MainConfigForm : Form
     private Button _btnTestConnection = null!;
     private Label _lblConnTestResult = null!;
 
-    // Tab 2: Depo Stok Tarihce
-    private CheckBox _chkDepoEnabled = null!;
-    private ListBox _lstDepoTimes = null!;
-    private DateTimePicker _dtpNewTime = null!;
-    private Button _btnAddTime = null!;
-    private Button _btnRemoveTime = null!;
-    private Button _btnClearTimes = null!;
-    private Button _btnPreset2Times = null!;
-    private Button _btnPreset3Times = null!;
-    private NumericUpDown _numDepoTimeout = null!;
-    private Button _btnRunDepoNow = null!;
-
-    // Tab 3: Sparis Durum Kontrol
-    private CheckBox _chkSparisEnabled = null!;
-    private NumericUpDown _numSparisInterval = null!;
-    private TextBox _txtSparisNo = null!;
-    private NumericUpDown _numSparisTimeout = null!;
-    private Button _btnRunSparisNow = null!;
-
-    // Tab 4: Service & Logs
+    // Tab 3: Service & Logs
     private Label _lblServiceStatus = null!;
     private Button _btnInstallService = null!;
     private Button _btnUninstallService = null!;
@@ -68,14 +59,14 @@ public class MainConfigForm : Form
         UpdateServiceStatus();
 
         AppLogger.OnLogMessage += AppendLogMessage;
-        AppLogger.Info("Yönetim Arayüzü açıldı. v1.0.0.1");
+        AppLogger.Info("FsoftERP Kontrol Servisi Yönetim Paneli açıldı. v1.0.1.0");
     }
 
     private void InitializeComponent()
     {
-        Text = "FsoftERP Kontrol Servisi - Ayar ve Yönetim Paneli (v1.0.0.1)";
-        Size = new Size(980, 750);
-        MinimumSize = new Size(880, 640);
+        Text = "FsoftERP Kontrol Servisi - Stored Procedure Otomasyon ve Yönetim Paneli (v1.0.1.0)";
+        Size = new Size(1020, 760);
+        MinimumSize = new Size(920, 640);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
         BackColor = Color.FromArgb(245, 247, 250);
@@ -99,7 +90,7 @@ public class MainConfigForm : Form
         }
         catch { }
 
-        // Root Layout
+        // Root Layout Table
         var rootTable = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -123,17 +114,13 @@ public class MainConfigForm : Form
             Padding = new Point(14, 8)
         };
 
+        var tabTasks = new TabPage("⚡ Stored Procedure Görevleri") { BackColor = Color.White, Padding = new Padding(15) };
+        tabTasks.Controls.Add(CreateTasksTab());
+        tabControl.TabPages.Add(tabTasks);
+
         var tabDb = new TabPage("🗄️ Veritabanı Bağlantısı") { BackColor = Color.White, Padding = new Padding(15) };
         tabDb.Controls.Add(CreateDatabaseTab());
         tabControl.TabPages.Add(tabDb);
-
-        var tabDepo = new TabPage("📦 Depo Stok Tarihçe") { BackColor = Color.White, Padding = new Padding(15) };
-        tabDepo.Controls.Add(CreateDepoTab());
-        tabControl.TabPages.Add(tabDepo);
-
-        var tabSparis = new TabPage("📋 Sipariş Durum Kontrol") { BackColor = Color.White, Padding = new Padding(15) };
-        tabSparis.Controls.Add(CreateSparisTab());
-        tabControl.TabPages.Add(tabSparis);
 
         var tabService = new TabPage("⚙️ Servis Yönetimi & Loglar") { BackColor = Color.White, Padding = new Padding(15) };
         tabService.Controls.Add(CreateServiceTab());
@@ -157,7 +144,6 @@ public class MainConfigForm : Form
             Padding = new Padding(15, 10, 15, 10)
         };
 
-        // Fsoft Logo or Icon
         var picLogo = new PictureBox
         {
             Size = new Size(130, 48),
@@ -188,14 +174,13 @@ public class MainConfigForm : Form
 
         var lblSub = new Label
         {
-            Text = "Depo Stok Tarihçe (Saatlik) & Sipariş Durum Kontrol (Periyodik) | FsoftERPSKWS v1.0.0.1",
+            Text = "Dinamik Stored Procedure Otomasyon Motoru | FsoftERPSKWS v1.0.1.0",
             Font = new Font("Segoe UI", 8.75f, FontStyle.Regular),
             ForeColor = Color.FromArgb(148, 163, 184),
             Location = new Point(156, 36),
             AutoSize = true
         };
 
-        // Header Save Button (Top Right)
         var pnlRight = new FlowLayoutPanel
         {
             Dock = DockStyle.Right,
@@ -210,7 +195,7 @@ public class MainConfigForm : Form
         {
             Text = "💾 AYARLARI KAYDET (Ctrl+S)",
             Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-            BackColor = Color.FromArgb(22, 163, 74), // Emerald green
+            BackColor = Color.FromArgb(22, 163, 74),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(230, 42),
@@ -221,6 +206,171 @@ public class MainConfigForm : Form
         pnlRight.Controls.Add(_btnHeaderSave);
 
         pnl.Controls.AddRange(new Control[] { picLogo, lblTitle, lblSub, pnlRight });
+        return pnl;
+    }
+
+    private Control CreateTasksTab()
+    {
+        var pnl = new Panel { Dock = DockStyle.Fill, Padding = new Padding(5) };
+
+        // Top Toolbar
+        var pnlToolbar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 46,
+            BackColor = Color.FromArgb(248, 250, 252),
+            Padding = new Padding(4, 5, 4, 5)
+        };
+
+        _btnAddTask = new Button
+        {
+            Text = "➕ Yeni SP Görevi Ekle",
+            Font = new Font("Segoe UI", 9.25f, FontStyle.Bold),
+            BackColor = Color.FromArgb(22, 163, 74),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(180, 34),
+            Cursor = Cursors.Hand
+        };
+        _btnAddTask.FlatAppearance.BorderSize = 0;
+        _btnAddTask.Click += OnAddTaskClick;
+
+        _btnEditTask = new Button
+        {
+            Text = "✏️ Görevi Düzenle",
+            Font = new Font("Segoe UI", 9f),
+            Size = new Size(130, 34),
+            Cursor = Cursors.Hand
+        };
+        _btnEditTask.Click += OnEditTaskClick;
+
+        _btnDeleteTask = new Button
+        {
+            Text = "🗑️ Görevi Sil",
+            Font = new Font("Segoe UI", 9f),
+            ForeColor = Color.FromArgb(220, 38, 38),
+            Size = new Size(110, 34),
+            Cursor = Cursors.Hand
+        };
+        _btnDeleteTask.Click += OnDeleteTaskClick;
+
+        _btnCloneTask = new Button
+        {
+            Text = "📋 Çoğalt (Klonla)",
+            Font = new Font("Segoe UI", 9f),
+            Size = new Size(130, 34),
+            Cursor = Cursors.Hand
+        };
+        _btnCloneTask.Click += OnCloneTaskClick;
+
+        _btnRunTaskNow = new Button
+        {
+            Text = "▶️ Seçili SP'yi Şimdi Çalıştır (Test)",
+            Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+            BackColor = Color.FromArgb(13, 110, 253),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(240, 34),
+            Cursor = Cursors.Hand
+        };
+        _btnRunTaskNow.FlatAppearance.BorderSize = 0;
+        _btnRunTaskNow.Click += async (s, e) => await OnRunTaskNowClick();
+
+        _btnMoveUp = new Button { Text = "⬆️", Size = new Size(40, 34), Cursor = Cursors.Hand };
+        _btnMoveUp.Click += (s, e) => MoveSelectedTask(-1);
+
+        _btnMoveDown = new Button { Text = "⬇️", Size = new Size(40, 34), Cursor = Cursors.Hand };
+        _btnMoveDown.Click += (s, e) => MoveSelectedTask(1);
+
+        pnlToolbar.Controls.AddRange(new Control[]
+        {
+            _btnAddTask, _btnEditTask, _btnDeleteTask, _btnCloneTask,
+            _btnRunTaskNow, _btnMoveUp, _btnMoveDown
+        });
+
+        // Grid
+        _dgvTasks = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.Fixed3D,
+            RowHeadersVisible = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            MultiSelect = false,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            AllowUserToResizeRows = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            RowTemplate = { Height = 34 }
+        };
+
+        var colEnabled = new DataGridViewCheckBoxColumn
+        {
+            HeaderText = "Aktif",
+            Name = "colEnabled",
+            Width = 55,
+            AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+        };
+
+        var colName = new DataGridViewTextBoxColumn
+        {
+            HeaderText = "Görev Adı",
+            Name = "colName",
+            ReadOnly = true,
+            FillWeight = 25f
+        };
+
+        var colProc = new DataGridViewTextBoxColumn
+        {
+            HeaderText = "Stored Procedure",
+            Name = "colProc",
+            ReadOnly = true,
+            FillWeight = 30f
+        };
+
+        var colSchedule = new DataGridViewTextBoxColumn
+        {
+            HeaderText = "Çalışma Planı (Zamanlama)",
+            Name = "colSchedule",
+            ReadOnly = true,
+            FillWeight = 30f
+        };
+
+        var colTimeout = new DataGridViewTextBoxColumn
+        {
+            HeaderText = "Timeout (sn)",
+            Name = "colTimeout",
+            ReadOnly = true,
+            Width = 90,
+            AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+        };
+
+        _dgvTasks.Columns.AddRange(colEnabled, colName, colProc, colSchedule, colTimeout);
+        _dgvTasks.CellDoubleClick += (s, e) =>
+        {
+            if (e.RowIndex >= 0) OnEditTaskClick(s, e);
+        };
+
+        _dgvTasks.CellValueChanged += (s, e) =>
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex == 0)
+            {
+                bool isChecked = Convert.ToBoolean(_dgvTasks.Rows[e.RowIndex].Cells[0].Value);
+                if (e.RowIndex < _config.Tasks.Count)
+                {
+                    _config.Tasks[e.RowIndex].Enabled = isChecked;
+                }
+            }
+        };
+
+        _dgvTasks.CurrentCellDirtyStateChanged += (s, e) =>
+        {
+            if (_dgvTasks.IsCurrentCellDirty)
+                _dgvTasks.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        };
+
+        pnl.Controls.Add(_dgvTasks);
+        pnl.Controls.Add(pnlToolbar);
         return pnl;
     }
 
@@ -329,293 +479,10 @@ public class MainConfigForm : Form
         return pnl;
     }
 
-    private Control CreateDepoTab()
-    {
-        var pnl = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(10) };
-
-        _chkDepoEnabled = new CheckBox
-        {
-            Text = "✅ Sp_Set_DepoStokTarihce Görevini Etkinleştir (Aktif / Pasif)",
-            Location = new Point(15, 15),
-            Size = new Size(600, 28),
-            Font = new Font("Segoe UI", 11f, FontStyle.Bold),
-            ForeColor = Color.FromArgb(15, 23, 42)
-        };
-        pnl.Controls.Add(_chkDepoEnabled);
-
-        var grp = new GroupBox
-        {
-            Text = "Çalışma Saatleri ve Parametreleri (Günde Belirtilen Saatlerde Çalışır)",
-            Font = new Font("Segoe UI", 9.75f, FontStyle.Bold),
-            Location = new Point(10, 50),
-            Size = new Size(760, 440)
-        };
-
-        var lblTimes = new Label { Text = "Planlanan Saatler Listesi (HH:mm):", Location = new Point(20, 30), AutoSize = true, Font = new Font("Segoe UI", 9.25f) };
-        _lstDepoTimes = new ListBox
-        {
-            Location = new Point(20, 55),
-            Size = new Size(220, 200),
-            Font = new Font("Consolas", 11f, FontStyle.Bold)
-        };
-
-        // Time add controls
-        var lblNewTime = new Label { Text = "Saat Seç:", Location = new Point(260, 55), AutoSize = true, Font = new Font("Segoe UI", 9f) };
-        _dtpNewTime = new DateTimePicker
-        {
-            Format = DateTimePickerFormat.Custom,
-            CustomFormat = "HH:mm",
-            ShowUpDown = true,
-            Location = new Point(260, 78),
-            Size = new Size(110, 26),
-            Font = new Font("Segoe UI", 10f)
-        };
-
-        _btnAddTime = new Button
-        {
-            Text = "➕ Saati Ekle",
-            Location = new Point(380, 77),
-            Size = new Size(120, 28),
-            BackColor = Color.FromArgb(22, 163, 74),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-            Cursor = Cursors.Hand
-        };
-        _btnAddTime.FlatAppearance.BorderSize = 0;
-        _btnAddTime.Click += (s, e) =>
-        {
-            string newTime = _dtpNewTime.Value.ToString("HH:mm");
-            if (!_lstDepoTimes.Items.Contains(newTime))
-            {
-                _lstDepoTimes.Items.Add(newTime);
-                SortDepoTimesList();
-            }
-        };
-
-        _btnRemoveTime = new Button
-        {
-            Text = "➖ Seçili Saati Sil",
-            Location = new Point(260, 115),
-            Size = new Size(140, 28),
-            Cursor = Cursors.Hand
-        };
-        _btnRemoveTime.Click += (s, e) =>
-        {
-            if (_lstDepoTimes.SelectedIndex >= 0)
-                _lstDepoTimes.Items.RemoveAt(_lstDepoTimes.SelectedIndex);
-        };
-
-        _btnClearTimes = new Button
-        {
-            Text = "🧹 Tüm Saatleri Temizle",
-            Location = new Point(410, 115),
-            Size = new Size(160, 28),
-            Cursor = Cursors.Hand
-        };
-        _btnClearTimes.Click += (s, e) => _lstDepoTimes.Items.Clear();
-
-        // Preset templates
-        var lblPresets = new Label { Text = "Hızlı Şablonlar:", Location = new Point(260, 160), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
-        _btnPreset2Times = new Button
-        {
-            Text = "📌 Günde 2 Kez (12:00, 19:00)",
-            Location = new Point(260, 185),
-            Size = new Size(240, 30),
-            Cursor = Cursors.Hand
-        };
-        _btnPreset2Times.Click += (s, e) =>
-        {
-            _lstDepoTimes.Items.Clear();
-            _lstDepoTimes.Items.Add("12:00");
-            _lstDepoTimes.Items.Add("19:00");
-        };
-
-        _btnPreset3Times = new Button
-        {
-            Text = "📌 Günde 3 Kez (06:00, 12:00, 21:00)",
-            Location = new Point(260, 222),
-            Size = new Size(240, 30),
-            Cursor = Cursors.Hand
-        };
-        _btnPreset3Times.Click += (s, e) =>
-        {
-            _lstDepoTimes.Items.Clear();
-            _lstDepoTimes.Items.Add("06:00");
-            _lstDepoTimes.Items.Add("12:00");
-            _lstDepoTimes.Items.Add("21:00");
-        };
-
-        // Timeout
-        var lblTimeout = new Label { Text = "Komut Zaman Aşımı (Timeout sn):", Location = new Point(20, 280), AutoSize = true, Font = new Font("Segoe UI", 9.25f) };
-        _numDepoTimeout = new NumericUpDown
-        {
-            Location = new Point(260, 277),
-            Size = new Size(120, 26),
-            Minimum = 10,
-            Maximum = 7200,
-            Value = 1000
-        };
-
-        // Manual Run Button
-        _btnRunDepoNow = new Button
-        {
-            Text = "▶️ Sp_Set_DepoStokTarihce Şimdi Çalıştır (Manuel Test)",
-            Location = new Point(20, 330),
-            Size = new Size(420, 42),
-            BackColor = Color.FromArgb(13, 110, 253),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9.75f, FontStyle.Bold),
-            Cursor = Cursors.Hand
-        };
-        _btnRunDepoNow.FlatAppearance.BorderSize = 0;
-        _btnRunDepoNow.Click += async (s, e) =>
-        {
-            _btnRunDepoNow.Enabled = false;
-            _btnRunDepoNow.Text = "Çalıştırılıyor, lütfen bekleyin...";
-            try
-            {
-                var cfg = BuildCurrentConfig();
-                var sql = new SqlService(cfg);
-                var res = await sql.ExecuteDepoStokTarihceAsync();
-                MessageBox.Show(this, res.Message, res.Success ? "Başarılı" : "Hata", MessageBoxButtons.OK, res.Success ? MessageBoxIcon.Information : MessageBoxIcon.Error);
-            }
-            finally
-            {
-                _btnRunDepoNow.Enabled = true;
-                _btnRunDepoNow.Text = "▶️ Sp_Set_DepoStokTarihce Şimdi Çalıştır (Manuel Test)";
-            }
-        };
-
-        grp.Controls.AddRange(new Control[]
-        {
-            lblTimes, _lstDepoTimes, lblNewTime, _dtpNewTime, _btnAddTime, _btnRemoveTime, _btnClearTimes,
-            lblPresets, _btnPreset2Times, _btnPreset3Times,
-            lblTimeout, _numDepoTimeout, _btnRunDepoNow
-        });
-
-        pnl.Controls.Add(grp);
-        return pnl;
-    }
-
-    private Control CreateSparisTab()
-    {
-        var pnl = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(10) };
-
-        _chkSparisEnabled = new CheckBox
-        {
-            Text = "✅ Sp_Set_SparisDurumKontrol Görevini Etkinleştir (Aktif / Pasif)",
-            Location = new Point(15, 15),
-            Size = new Size(600, 28),
-            Font = new Font("Segoe UI", 11f, FontStyle.Bold),
-            ForeColor = Color.FromArgb(15, 23, 42)
-        };
-        pnl.Controls.Add(_chkSparisEnabled);
-
-        var grp = new GroupBox
-        {
-            Text = "Periyodik Çalışma Parametreleri (Dakika Aralıklarıyla Çalışır)",
-            Font = new Font("Segoe UI", 9.75f, FontStyle.Bold),
-            Location = new Point(10, 50),
-            Size = new Size(760, 360)
-        };
-
-        int leftLabel = 20;
-        int leftControl = 260;
-        int top = 35;
-
-        // Interval
-        var lblInterval = new Label { Text = "Çalışma Aralığı (Dakika):", Location = new Point(leftLabel, top + 3), AutoSize = true, Font = new Font("Segoe UI", 9.25f) };
-        _numSparisInterval = new NumericUpDown
-        {
-            Location = new Point(leftControl, top),
-            Size = new Size(120, 26),
-            Minimum = 1,
-            Maximum = 1440,
-            Value = 3,
-            Font = new Font("Segoe UI", 9.25f)
-        };
-        var lblIntervalHint = new Label
-        {
-            Text = "(Örn: 3 yazarsanız her 3 dakikada bir otomatik kontrol edilir)",
-            Location = new Point(leftControl + 130, top + 4),
-            AutoSize = true,
-            ForeColor = Color.FromArgb(100, 116, 139),
-            Font = new Font("Segoe UI", 8.75f)
-        };
-        grp.Controls.AddRange(new Control[] { lblInterval, _numSparisInterval, lblIntervalHint });
-
-        // SiparisNo parameter
-        top += 45;
-        var lblSiparisNo = new Label { Text = "Sipariş No Parametresi:", Location = new Point(leftLabel, top + 3), AutoSize = true, Font = new Font("Segoe UI", 9.25f) };
-        _txtSparisNo = new TextBox { Location = new Point(leftControl, top), Size = new Size(240, 26), Font = new Font("Segoe UI", 9.25f) };
-        var lblSiparisNoHint = new Label
-        {
-            Text = "(Boş bırakılırsa @SiparisNo = NULL gönderilir, tüm siparişler kontrol edilir)",
-            Location = new Point(leftControl + 250, top + 4),
-            AutoSize = true,
-            ForeColor = Color.FromArgb(100, 116, 139),
-            Font = new Font("Segoe UI", 8.75f)
-        };
-        grp.Controls.AddRange(new Control[] { lblSiparisNo, _txtSparisNo, lblSiparisNoHint });
-
-        // Timeout
-        top += 45;
-        var lblTimeout = new Label { Text = "Komut Zaman Aşımı (Timeout sn):", Location = new Point(leftLabel, top + 3), AutoSize = true, Font = new Font("Segoe UI", 9.25f) };
-        _numSparisTimeout = new NumericUpDown
-        {
-            Location = new Point(leftControl, top),
-            Size = new Size(120, 26),
-            Minimum = 10,
-            Maximum = 7200,
-            Value = 1000,
-            Font = new Font("Segoe UI", 9.25f)
-        };
-        grp.Controls.AddRange(new Control[] { lblTimeout, _numSparisTimeout });
-
-        // Manual Run Button
-        top += 60;
-        _btnRunSparisNow = new Button
-        {
-            Text = "▶️ Sp_Set_SparisDurumKontrol Şimdi Çalıştır (Manuel Test)",
-            Location = new Point(leftLabel, top),
-            Size = new Size(440, 42),
-            BackColor = Color.FromArgb(13, 110, 253),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9.75f, FontStyle.Bold),
-            Cursor = Cursors.Hand
-        };
-        _btnRunSparisNow.FlatAppearance.BorderSize = 0;
-        _btnRunSparisNow.Click += async (s, e) =>
-        {
-            _btnRunSparisNow.Enabled = false;
-            _btnRunSparisNow.Text = "Çalıştırılıyor, lütfen bekleyin...";
-            try
-            {
-                var cfg = BuildCurrentConfig();
-                var sql = new SqlService(cfg);
-                var res = await sql.ExecuteSparisDurumKontrolAsync();
-                MessageBox.Show(this, res.Message, res.Success ? "Başarılı" : "Hata", MessageBoxButtons.OK, res.Success ? MessageBoxIcon.Information : MessageBoxIcon.Error);
-            }
-            finally
-            {
-                _btnRunSparisNow.Enabled = true;
-                _btnRunSparisNow.Text = "▶️ Sp_Set_SparisDurumKontrol Şimdi Çalıştır (Manuel Test)";
-            }
-        };
-        grp.Controls.Add(_btnRunSparisNow);
-
-        pnl.Controls.Add(grp);
-        return pnl;
-    }
-
     private Control CreateServiceTab()
     {
         var pnl = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(10) };
 
-        // Group 1: Windows Service Management
         var grpService = new GroupBox
         {
             Text = "Windows Arka Plan Servis Yönetimi (FsoftERPSKWS)",
@@ -635,7 +502,6 @@ public class MainConfigForm : Form
         };
         grpService.Controls.AddRange(new Control[] { lblStatusTitle, _lblServiceStatus });
 
-        // Service buttons
         _btnInstallService = new Button
         {
             Text = "🛠️ Servisi Kur",
@@ -646,8 +512,8 @@ public class MainConfigForm : Form
         };
         _btnInstallService.Click += (s, e) =>
         {
-            var cfg = BuildCurrentConfig();
-            var res = ServiceManager.InstallService(cfg);
+            SyncDatabaseSettingsFromUi();
+            var res = ServiceManager.InstallService(_config);
             MessageBox.Show(this, res.Message, res.Success ? "Bilgi" : "Hata", MessageBoxButtons.OK, res.Success ? MessageBoxIcon.Information : MessageBoxIcon.Error);
             UpdateServiceStatus();
         };
@@ -662,7 +528,7 @@ public class MainConfigForm : Form
         };
         _btnUninstallService.Click += (s, e) =>
         {
-            if (MessageBox.Show(this, "Windows Servisini kaldırmak istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (MessageBox.Show(this, "Windows Servisini sistemden kaldırmak istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 var res = ServiceManager.UninstallService(_config.Service.ServiceName);
                 MessageBox.Show(this, res.Message, res.Success ? "Bilgi" : "Hata", MessageBoxButtons.OK, res.Success ? MessageBoxIcon.Information : MessageBoxIcon.Error);
@@ -832,7 +698,7 @@ public class MainConfigForm : Form
     }
     #endregion
 
-    #region Data Binding & Logic
+    #region Task Grid Management
     private void LoadConfigToUi()
     {
         // Database
@@ -847,70 +713,169 @@ public class MainConfigForm : Form
         _txtPassword.Enabled = !_chkWindowsAuth.Checked;
         _btnTogglePassword.Enabled = !_chkWindowsAuth.Checked;
 
-        // Depo
-        _chkDepoEnabled.Checked = _config.DepoStokTarihce.Enabled;
-        _lstDepoTimes.Items.Clear();
-        foreach (var t in _config.DepoStokTarihce.ExecutionTimes)
-        {
-            _lstDepoTimes.Items.Add(t);
-        }
-        SortDepoTimesList();
-        _numDepoTimeout.Value = Math.Clamp(_config.DepoStokTarihce.CommandTimeoutSeconds, 10, 7200);
-
-        // Sparis
-        _chkSparisEnabled.Checked = _config.SparisDurumKontrol.Enabled;
-        _numSparisInterval.Value = Math.Clamp(_config.SparisDurumKontrol.IntervalMinutes, 1, 1440);
-        _txtSparisNo.Text = _config.SparisDurumKontrol.SiparisNo ?? "";
-        _numSparisTimeout.Value = Math.Clamp(_config.SparisDurumKontrol.CommandTimeoutSeconds, 10, 7200);
+        // Tasks Grid
+        RefreshTasksGrid();
     }
 
-    private AppConfig BuildCurrentConfig()
+    private void RefreshTasksGrid()
     {
-        var cfg = new AppConfig();
+        int selectedIndex = _dgvTasks.SelectedRows.Count > 0 ? _dgvTasks.SelectedRows[0].Index : -1;
+        _dgvTasks.Rows.Clear();
 
-        // Database
-        cfg.Database.Server = _txtServer.Text.Trim();
-        cfg.Database.Database = _txtDatabase.Text.Trim();
-        cfg.Database.UseWindowsAuth = _chkWindowsAuth.Checked;
-        cfg.Database.UserId = _txtUserId.Text.Trim();
-        cfg.Database.Password = _txtPassword.Text; // Will be protected automatically on save
-        cfg.Database.ConnectionTimeoutSeconds = (int)_numConnTimeout.Value;
+        foreach (var task in _config.Tasks)
+        {
+            int rowIdx = _dgvTasks.Rows.Add(
+                task.Enabled,
+                task.Name,
+                task.ProcedureName,
+                task.GetScheduleSummary(),
+                task.CommandTimeoutSeconds
+            );
+            _dgvTasks.Rows[rowIdx].Tag = task;
+        }
 
-        // Depo
-        cfg.DepoStokTarihce.Enabled = _chkDepoEnabled.Checked;
-        cfg.DepoStokTarihce.ExecutionTimes = _lstDepoTimes.Items.Cast<string>().ToList();
-        cfg.DepoStokTarihce.CommandTimeoutSeconds = (int)_numDepoTimeout.Value;
+        if (selectedIndex >= 0 && selectedIndex < _dgvTasks.Rows.Count)
+        {
+            _dgvTasks.Rows[selectedIndex].Selected = true;
+        }
+    }
 
-        // Sparis
-        cfg.SparisDurumKontrol.Enabled = _chkSparisEnabled.Checked;
-        cfg.SparisDurumKontrol.IntervalMinutes = (int)_numSparisInterval.Value;
-        cfg.SparisDurumKontrol.SiparisNo = string.IsNullOrWhiteSpace(_txtSparisNo.Text) ? null : _txtSparisNo.Text.Trim();
-        cfg.SparisDurumKontrol.CommandTimeoutSeconds = (int)_numSparisTimeout.Value;
+    private void OnAddTaskClick(object? sender, EventArgs e)
+    {
+        using var dlg = new TaskEditDialog();
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _config.Tasks.Add(dlg.ResultTask);
+            RefreshTasksGrid();
+            _lblStatus.Text = $"Yeni görev eklendi: {dlg.ResultTask.ProcedureName} (Kaydetmeyi unutmayınız)";
+        }
+    }
 
-        // Service
-        cfg.Service.ServiceName = _config.Service.ServiceName;
-        cfg.Service.DisplayName = _config.Service.DisplayName;
-        cfg.Service.Description = _config.Service.Description;
+    private void OnEditTaskClick(object? sender, EventArgs e)
+    {
+        if (_dgvTasks.SelectedRows.Count == 0) return;
+        int idx = _dgvTasks.SelectedRows[0].Index;
+        if (idx < 0 || idx >= _config.Tasks.Count) return;
 
-        return cfg;
+        var task = _config.Tasks[idx];
+        using var dlg = new TaskEditDialog(task);
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _config.Tasks[idx] = dlg.ResultTask;
+            RefreshTasksGrid();
+            _lblStatus.Text = $"Görev güncellendi: {dlg.ResultTask.ProcedureName} (Kaydetmeyi unutmayınız)";
+        }
+    }
+
+    private void OnDeleteTaskClick(object? sender, EventArgs e)
+    {
+        if (_dgvTasks.SelectedRows.Count == 0) return;
+        int idx = _dgvTasks.SelectedRows[0].Index;
+        if (idx < 0 || idx >= _config.Tasks.Count) return;
+
+        var task = _config.Tasks[idx];
+        var res = MessageBox.Show(this,
+            $"'{task.ProcedureName}' görevini silmek istediğinize emin misiniz?",
+            "Görev Sil",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (res == DialogResult.Yes)
+        {
+            _config.Tasks.RemoveAt(idx);
+            RefreshTasksGrid();
+            _lblStatus.Text = $"Görev silindi: {task.ProcedureName}";
+        }
+    }
+
+    private void OnCloneTaskClick(object? sender, EventArgs e)
+    {
+        if (_dgvTasks.SelectedRows.Count == 0) return;
+        int idx = _dgvTasks.SelectedRows[0].Index;
+        if (idx < 0 || idx >= _config.Tasks.Count) return;
+
+        var task = _config.Tasks[idx];
+        var cloned = task.Clone();
+        _config.Tasks.Insert(idx + 1, cloned);
+        RefreshTasksGrid();
+        _lblStatus.Text = $"Görev klonlandı: {cloned.ProcedureName}";
+    }
+
+    private async Task OnRunTaskNowClick()
+    {
+        if (_dgvTasks.SelectedRows.Count == 0)
+        {
+            MessageBox.Show(this, "Lütfen çalıştırmak istediğiniz görevi tablodan seçiniz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        int idx = _dgvTasks.SelectedRows[0].Index;
+        if (idx < 0 || idx >= _config.Tasks.Count) return;
+
+        var task = _config.Tasks[idx];
+        SyncDatabaseSettingsFromUi();
+
+        _btnRunTaskNow.Enabled = false;
+        _btnRunTaskNow.Text = "Çalıştırılıyor, bekleyin...";
+
+        try
+        {
+            var sql = new SqlService(_config);
+            var res = await sql.ExecuteTaskAsync(task);
+
+            MessageBox.Show(this, res.Message, res.Success ? "Test Başarılı" : "Hata", MessageBoxButtons.OK, res.Success ? MessageBoxIcon.Information : MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _btnRunTaskNow.Enabled = true;
+            _btnRunTaskNow.Text = "▶️ Seçili SP'yi Şimdi Çalıştır (Test)";
+        }
+    }
+
+    private void MoveSelectedTask(int direction)
+    {
+        if (_dgvTasks.SelectedRows.Count == 0) return;
+        int idx = _dgvTasks.SelectedRows[0].Index;
+        int newIdx = idx + direction;
+
+        if (newIdx < 0 || newIdx >= _config.Tasks.Count) return;
+
+        var item = _config.Tasks[idx];
+        _config.Tasks.RemoveAt(idx);
+        _config.Tasks.Insert(newIdx, item);
+
+        RefreshTasksGrid();
+        _dgvTasks.Rows[newIdx].Selected = true;
+    }
+    #endregion
+
+    #region Save & Test Logic
+    private void SyncDatabaseSettingsFromUi()
+    {
+        _config.Database.Server = _txtServer.Text.Trim();
+        _config.Database.Database = _txtDatabase.Text.Trim();
+        _config.Database.UseWindowsAuth = _chkWindowsAuth.Checked;
+        _config.Database.UserId = _txtUserId.Text.Trim();
+        _config.Database.Password = _txtPassword.Text;
+        _config.Database.ConnectionTimeoutSeconds = (int)_numConnTimeout.Value;
     }
 
     private void SaveConfigFromUi()
     {
         try
         {
-            var cfg = BuildCurrentConfig();
-            AppConfig.Save(AppConfig.DefaultConfigPath, cfg);
+            SyncDatabaseSettingsFromUi();
+            AppConfig.Save(AppConfig.DefaultConfigPath, _config);
 
             _lblStatus.Text = $"✅ Ayarlar başarıyla kaydedildi ({DateTime.Now:HH:mm:ss})";
             _lblStatus.ForeColor = Color.FromArgb(22, 163, 74);
 
             MessageBox.Show(this,
-                "Tüm ayarlar başarıyla kaydedildi! ✅\n\n" +
-                $"• Sunucu: {cfg.Database.Server} / {cfg.Database.Database}\n" +
-                $"• Depo Stok Tarihçe: {(cfg.DepoStokTarihce.Enabled ? "Aktif (" + string.Join(", ", cfg.DepoStokTarihce.ExecutionTimes) + ")" : "Pasif")}\n" +
-                $"• Sipariş Durum Kontrol: {(cfg.SparisDurumKontrol.Enabled ? "Aktif (" + cfg.SparisDurumKontrol.IntervalMinutes + " dakikada bir)" : "Pasif")}\n\n" +
-                "Arka plan servisi çalışıyorsa yeni ayarlar otomatik olarak devreye girecektir.",
+                "Tüm ayarlar ve Stored Procedure görevleri başarıyla kaydedildi! ✅\n\n" +
+                $"• Sunucu: {_config.Database.Server} / {_config.Database.Database}\n" +
+                $"• Tanımlı SP Görev Sayısı: {_config.Tasks.Count}\n" +
+                $"• Aktif Görevler: {_config.Tasks.Count(t => t.Enabled)}\n\n" +
+                "Arka plan servisi çalışıyorsa yeni görevler otomatik olarak devreye girecektir.",
                 "Kayıt Başarılı",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -929,8 +894,8 @@ public class MainConfigForm : Form
 
         try
         {
-            var cfg = BuildCurrentConfig();
-            var sql = new SqlService(cfg);
+            SyncDatabaseSettingsFromUi();
+            var sql = new SqlService(_config);
             var res = await sql.TestConnectionAsync();
 
             _lblConnTestResult.Text = res.Message;
@@ -972,13 +937,6 @@ public class MainConfigForm : Form
             _btnStartService.Enabled = true;
             _btnStopService.Enabled = false;
         }
-    }
-
-    private void SortDepoTimesList()
-    {
-        var list = _lstDepoTimes.Items.Cast<string>().OrderBy(x => x).ToList();
-        _lstDepoTimes.Items.Clear();
-        foreach (var item in list) _lstDepoTimes.Items.Add(item);
     }
 
     private void AppendLogMessage(string message)

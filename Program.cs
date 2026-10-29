@@ -88,36 +88,45 @@ internal static class Program
         }
 
         // 3. Tek Seferlik Manuel Test Çalıştırma Komutları
-        if (args.Contains("--run-depo", StringComparer.OrdinalIgnoreCase))
+        if (args.Contains("--run-all", StringComparer.OrdinalIgnoreCase))
         {
-            Console.WriteLine("Sp_Set_DepoStokTarihce stored procedure çalıştırılıyor...");
+            Console.WriteLine($"Toplam {config.Tasks.Count} görev çalıştırılıyor...");
             var sql = new SqlService(config);
-            var res = await sql.ExecuteDepoStokTarihceAsync();
-            Console.WriteLine(res.Message);
-            return res.Success ? 0 : 1;
+            foreach (var task in config.Tasks.Where(t => t.Enabled))
+            {
+                Console.WriteLine($"-> {task.ProcedureName}...");
+                var res = await sql.ExecuteTaskAsync(task);
+                Console.WriteLine($"   {res.Message}");
+            }
+            return 0;
         }
 
-        if (args.Contains("--run-siparis", StringComparer.OrdinalIgnoreCase))
+        var runArg = args.FirstOrDefault(a => a.StartsWith("--run-sp=", StringComparison.OrdinalIgnoreCase));
+        if (runArg != null)
         {
-            Console.WriteLine("Sp_Set_SparisDurumKontrol stored procedure çalıştırılıyor...");
+            string spName = runArg.Substring("--run-sp=".Length).Trim();
+            var task = config.Tasks.FirstOrDefault(t => string.Equals(t.ProcedureName, spName, StringComparison.OrdinalIgnoreCase))
+                       ?? new SpTaskConfig { Name = spName, ProcedureName = spName, CommandTimeoutSeconds = 1000 };
+
+            Console.WriteLine($"{spName} stored procedure çalıştırılıyor...");
             var sql = new SqlService(config);
-            var res = await sql.ExecuteSparisDurumKontrolAsync();
+            var res = await sql.ExecuteTaskAsync(task);
             Console.WriteLine(res.Message);
             return res.Success ? 0 : 1;
         }
 
         if (args.Contains("--help", StringComparer.OrdinalIgnoreCase) || args.Contains("-h", StringComparer.OrdinalIgnoreCase))
         {
-            Console.WriteLine("FsoftERP Kontrol Servisi (FsoftERPSKWS)");
+            Console.WriteLine("FsoftERP Kontrol Servisi (FsoftERPSKWS) v1.0.1.0");
             Console.WriteLine("Kullanım:");
-            Console.WriteLine("  FsoftERPSKWS.exe                 : Görsel Ayar ve Yönetim Panelini açar (GUI)");
-            Console.WriteLine("  FsoftERPSKWS.exe --service       : Windows Servis modunda arka planda çalıştırır");
-            Console.WriteLine("  FsoftERPSKWS.exe --install       : Windows Servisini sisteme kurar");
-            Console.WriteLine("  FsoftERPSKWS.exe --uninstall     : Windows Servisini sistemden kaldırır");
-            Console.WriteLine("  FsoftERPSKWS.exe --start         : Windows Servisini başlatır");
-            Console.WriteLine("  FsoftERPSKWS.exe --stop          : Windows Servisini durdurur");
-            Console.WriteLine("  FsoftERPSKWS.exe --run-depo      : Sp_Set_DepoStokTarihce procedure'ünü hemen çalıştırır");
-            Console.WriteLine("  FsoftERPSKWS.exe --run-siparis   : Sp_Set_SparisDurumKontrol procedure'ünü hemen çalıştırır");
+            Console.WriteLine("  FsoftERPSKWS.exe                     : Görsel Ayar ve Yönetim Panelini açar (GUI)");
+            Console.WriteLine("  FsoftERPSKWS.exe --service           : Windows Servis modunda arka planda çalıştırır");
+            Console.WriteLine("  FsoftERPSKWS.exe --install           : Windows Servisini sisteme otomatik başlangıçlı kurar");
+            Console.WriteLine("  FsoftERPSKWS.exe --uninstall         : Windows Servisini sistemden kaldırır");
+            Console.WriteLine("  FsoftERPSKWS.exe --start             : Windows Servisini başlatır");
+            Console.WriteLine("  FsoftERPSKWS.exe --stop              : Windows Servisini durdurur");
+            Console.WriteLine("  FsoftERPSKWS.exe --run-all           : Aktif tüm Stored Procedure'leri hemen çalıştırır");
+            Console.WriteLine("  FsoftERPSKWS.exe --run-sp=<SP_ADI>   : Belirtilen Stored Procedure'ü hemen çalıştırır");
             return 0;
         }
 

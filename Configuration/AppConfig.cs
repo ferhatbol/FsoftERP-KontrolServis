@@ -6,11 +6,73 @@ using Microsoft.Data.SqlClient;
 
 namespace FsoftERP.KontrolServis.Configuration;
 
+public enum SpScheduleType
+{
+    SpecificTimes = 0,    // Belirtilen Saatlerde (Örn: 12:00, 19:00)
+    IntervalMinutes = 1   // Belirli Dakika Aralıklarında (Örn: 3 dakikada bir)
+}
+
+public class SpParameterConfig
+{
+    public string Name { get; set; } = "";
+    public string? Value { get; set; } = null; // null veya boş ise DBNull olarak iletilir
+}
+
+public class SpTaskConfig
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "Yeni Görev";
+    public string ProcedureName { get; set; } = "";
+    public bool Enabled { get; set; } = true;
+    public SpScheduleType ScheduleType { get; set; } = SpScheduleType.IntervalMinutes;
+    public int IntervalMinutes { get; set; } = 3;
+    public List<string> ExecutionTimes { get; set; } = new() { "12:00", "19:00" };
+    public List<SpParameterConfig> Parameters { get; set; } = new();
+    public int CommandTimeoutSeconds { get; set; } = 1000;
+
+    [JsonIgnore]
+    public DateTime? LastRunTime { get; set; }
+    [JsonIgnore]
+    public string? LastRunStatus { get; set; }
+    [JsonIgnore]
+    public TimeSpan? LastRunDuration { get; set; }
+
+    public string GetScheduleSummary()
+    {
+        if (ScheduleType == SpScheduleType.IntervalMinutes)
+        {
+            return $"⏱️ Her {IntervalMinutes} dakikada bir";
+        }
+        else
+        {
+            string times = ExecutionTimes != null && ExecutionTimes.Count > 0 
+                ? string.Join(", ", ExecutionTimes.OrderBy(t => t)) 
+                : "Saat belirtilmedi";
+            return $"🕒 Günde {ExecutionTimes?.Count ?? 0} kez: {times}";
+        }
+    }
+
+    public SpTaskConfig Clone()
+    {
+        return new SpTaskConfig
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = Name + " (Kopya)",
+            ProcedureName = ProcedureName,
+            Enabled = Enabled,
+            ScheduleType = ScheduleType,
+            IntervalMinutes = IntervalMinutes,
+            ExecutionTimes = new List<string>(ExecutionTimes),
+            Parameters = Parameters.Select(p => new SpParameterConfig { Name = p.Name, Value = p.Value }).ToList(),
+            CommandTimeoutSeconds = CommandTimeoutSeconds
+        };
+    }
+}
+
 public class AppConfig
 {
     public DatabaseConfig Database { get; set; } = new();
-    public DepoStokTarihceConfig DepoStokTarihce { get; set; } = new();
-    public SparisDurumKontrolConfig SparisDurumKontrol { get; set; } = new();
+    public List<SpTaskConfig> Tasks { get; set; } = new();
     public ServiceConfig Service { get; set; } = new();
     public LoggingConfig Logging { get; set; } = new();
 
@@ -21,7 +83,7 @@ public class AppConfig
         string filePath = path ?? DefaultConfigPath;
         if (!File.Exists(filePath))
         {
-            var newConfig = new AppConfig();
+            var newConfig = CreateDefaultConfig();
             Save(filePath, newConfig);
             return newConfig;
         }
@@ -35,11 +97,19 @@ public class AppConfig
                 ReadCommentHandling = JsonCommentHandling.Skip
             };
             var config = JsonSerializer.Deserialize<AppConfig>(json, options) ?? new AppConfig();
+
+            // Eğer listede görev yoksa varsayılanları ekle
+            if (config.Tasks == null || config.Tasks.Count == 0)
+            {
+                config.Tasks = CreateDefaultTasks();
+                Save(filePath, config);
+            }
+
             return config;
         }
         catch
         {
-            return new AppConfig();
+            return CreateDefaultConfig();
         }
     }
 
@@ -52,7 +122,7 @@ public class AppConfig
             Directory.CreateDirectory(dir);
         }
 
-        // Şifreleri kaydederken DPAPI ile koru
+        // Şifreyi kaydederken DPAPI ile koru
         if (!string.IsNullOrEmpty(config.Database.Password) && !SecurityHelper.IsEncrypted(config.Database.Password))
         {
             config.Database.Password = SecurityHelper.Protect(config.Database.Password);
@@ -68,6 +138,58 @@ public class AppConfig
         string tmp = filePath + ".tmp";
         File.WriteAllText(tmp, json);
         File.Move(tmp, filePath, overwrite: true);
+    }
+
+    private static AppConfig CreateDefaultConfig()
+    {
+        return new AppConfig
+        {
+            Database = new DatabaseConfig(),
+            Tasks = CreateDefaultTasks(),
+            Service = new ServiceConfig(),
+            Logging = new LoggingConfig()
+        };
+    }
+
+    public static List<SpTaskConfig> CreateDefaultTasks()
+    {
+        return new List<SpTaskConfig>
+        {
+            new SpTaskConfig
+            {
+                Id = "task_depo_stok",
+                Name = "Depo Stok Tarihçe Güncelleme",
+                ProcedureName = "Sp_Set_DepoStokTarihce",
+                Enabled = true,
+                ScheduleType = SpScheduleType.SpecificTimes,
+                ExecutionTimes = new List<string> { "12:00", "19:00" },
+                CommandTimeoutSeconds = 1000
+            },
+            new SpTaskConfig
+            {
+                Id = "task_siparis_durum",
+                Name = "Sipariş Durum Kontrol",
+                ProcedureName = "Sp_Set_SparisDurumKontrol",
+                Enabled = true,
+                ScheduleType = SpScheduleType.IntervalMinutes,
+                IntervalMinutes = 3,
+                Parameters = new List<SpParameterConfig>
+                {
+                    new SpParameterConfig { Name = "@SiparisNo", Value = null }
+                },
+                CommandTimeoutSeconds = 1000
+            },
+            new SpTaskConfig
+            {
+                Id = "task_satinalma_durum",
+                Name = "Satınalma Durum Kontrol",
+                ProcedureName = "Sp_Set_SatınalmaDurumKontrol",
+                Enabled = true,
+                ScheduleType = SpScheduleType.SpecificTimes,
+                ExecutionTimes = new List<string> { "12:00" },
+                CommandTimeoutSeconds = 1000
+            }
+        };
     }
 }
 
@@ -109,26 +231,11 @@ public class DatabaseConfig
     }
 }
 
-public class DepoStokTarihceConfig
-{
-    public bool Enabled { get; set; } = true;
-    public List<string> ExecutionTimes { get; set; } = new() { "12:00", "19:00" };
-    public int CommandTimeoutSeconds { get; set; } = 1000;
-}
-
-public class SparisDurumKontrolConfig
-{
-    public bool Enabled { get; set; } = true;
-    public int IntervalMinutes { get; set; } = 3;
-    public string? SiparisNo { get; set; } = null;
-    public int CommandTimeoutSeconds { get; set; } = 1000;
-}
-
 public class ServiceConfig
 {
     public string ServiceName { get; set; } = "FsoftERPSKWS";
     public string DisplayName { get; set; } = "FsoftERP Kontrol Servisi";
-    public string Description { get; set; } = "FsoftERP Depo Stok Tarihçe ve Sipariş Durum Kontrol Windows Servisi";
+    public string Description { get; set; } = "FsoftERP Stored Procedure Otomasyon ve Kontrol Windows Servisi";
 }
 
 public class LoggingConfig

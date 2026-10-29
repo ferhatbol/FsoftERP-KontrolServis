@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using FsoftERP.KontrolServis.Configuration;
 using Microsoft.Extensions.Hosting;
 
@@ -7,8 +8,9 @@ public class KontrolBackgroundService : BackgroundService
 {
     private AppConfig _config;
     private SqlService _sqlService;
-    private readonly HashSet<string> _executedDepoSlots = new();
-    private DateTime _lastSparisExecutionTime = DateTime.MinValue;
+    private readonly HashSet<string> _executedTimeSlots = new();
+    private readonly ConcurrentDictionary<string, DateTime> _lastIntervalRunTimes = new();
+    private readonly ConcurrentDictionary<string, bool> _currentlyExecutingTasks = new();
     private DateTime _lastConfigReloadTime = DateTime.MinValue;
 
     public KontrolBackgroundService()
@@ -21,13 +23,16 @@ public class KontrolBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         AppLogger.Info("=================================================");
-        AppLogger.Info("FsoftERP Kontrol Servisi (FsoftERPSKWS) Başlatıldı.");
+        AppLogger.Info("FsoftERP Kontrol Servisi (FsoftERPSKWS) Başlatıldı. v1.0.1.0");
         AppLogger.Info($"Veritabanı: {_config.Database.Server} / {_config.Database.Database}");
-        AppLogger.Info($"Depo Stok Tarihçe: {(_config.DepoStokTarihce.Enabled ? "AKTİF (" + string.Join(", ", _config.DepoStokTarihce.ExecutionTimes) + ")" : "PASİF")}");
-        AppLogger.Info($"Sipariş Durum Kontrol: {(_config.SparisDurumKontrol.Enabled ? "AKTİF (" + _config.SparisDurumKontrol.IntervalMinutes + " dakikada bir)" : "PASİF")}");
+        AppLogger.Info($"Tanımlı Toplam SP Görev Sayısı: {_config.Tasks.Count}");
+        foreach (var t in _config.Tasks)
+        {
+            AppLogger.Info($" - [{t.ProcedureName}] {(t.Enabled ? "AKTİF" : "PASİF")} -> {t.GetScheduleSummary()}");
+        }
         AppLogger.Info("=================================================");
 
-        // İlk başlangıçta veritabanı bağlantı testi yap
+        // Başlangıç veritabanı testi
         var connTest = await _sqlService.TestConnectionAsync(stoppingToken);
         if (connTest.Success)
         {
@@ -35,31 +40,98 @@ public class KontrolBackgroundService : BackgroundService
         }
         else
         {
-            AppLogger.Warn($"Başlangıç Veritabanı Uyarısı: {connTest.Message} (Servis çalışmaya devam ediyor, bağlantı gelince yeniden denenecektir)");
+            AppLogger.Warn($"Başlangıç Veritabanı Uyarısı: {connTest.Message} (Bağlantı sağlandığında görevler çalışacaktır)");
         }
 
-        // Ana çalışma döngüsü (15 saniyede bir kontrol eder)
+        // Ana döngü
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                // Ayar dosyasını her 30 saniyede bir kontrol edip yenilikleri al
                 CheckAndReloadConfig();
 
                 var now = DateTime.Now;
+                string currentHm = now.ToString("HH:mm");
+                string todayStr = now.ToString("yyyyMMdd");
 
-                // 1. Depo Stok Tarihçe Kontrolü (Belirtilen Saatlerde)
-                await CheckAndRunDepoStokTarihceAsync(now, stoppingToken);
+                // Eski günün zaman kayıtlarını temizle
+                _executedTimeSlots.RemoveWhere(s => !s.Contains($"_{todayStr}_"));
 
-                // 2. Sipariş Durum Kontrolü (Belirtilen Dakika Aralıklarıyla)
-                await CheckAndRunSparisDurumKontrolAsync(now, stoppingToken);
+                foreach (var task in _config.Tasks)
+                {
+                    if (!task.Enabled || string.IsNullOrWhiteSpace(task.ProcedureName))
+                        continue;
+
+                    // Bu görev şu anda çalışıyorsa çakışmayı önlemek için atla
+                    if (_currentlyExecutingTasks.TryGetValue(task.Id, out bool isRunning) && isRunning)
+                        continue;
+
+                    bool shouldRun = false;
+                    string triggerReason = "";
+
+                    if (task.ScheduleType == SpScheduleType.IntervalMinutes)
+                    {
+                        int interval = Math.Max(1, task.IntervalMinutes);
+                        DateTime lastRun = _lastIntervalRunTimes.GetOrAdd(task.Id, DateTime.MinValue);
+
+                        if (now - lastRun >= TimeSpan.FromMinutes(interval))
+                        {
+                            shouldRun = true;
+                            triggerReason = $"Periyodik ({interval} dk aralık)";
+                            _lastIntervalRunTimes[task.Id] = now;
+                        }
+                    }
+                    else if (task.ScheduleType == SpScheduleType.SpecificTimes)
+                    {
+                        if (task.ExecutionTimes != null && task.ExecutionTimes.Count > 0)
+                        {
+                            foreach (var rawTime in task.ExecutionTimes)
+                            {
+                                string targetTime = NormalizeTime(rawTime);
+                                if (string.Equals(currentHm, targetTime, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    string slotKey = $"{task.Id}_{todayStr}_{targetTime}";
+                                    if (!_executedTimeSlots.Contains(slotKey))
+                                    {
+                                        _executedTimeSlots.Add(slotKey);
+                                        shouldRun = true;
+                                        triggerReason = $"Planlanan Saat ({targetTime})";
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (shouldRun)
+                    {
+                        var taskToRun = task;
+                        _currentlyExecutingTasks[taskToRun.Id] = true;
+
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                AppLogger.Info($"[TETİKLENDİ] Görev: '{taskToRun.Name}' | Sebep: {triggerReason}");
+                                await _sqlService.ExecuteTaskAsync(taskToRun, stoppingToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                AppLogger.Error($"Görev çalıştırma hatası: {taskToRun.Name}", ex);
+                            }
+                            finally
+                            {
+                                _currentlyExecutingTasks[taskToRun.Id] = false;
+                            }
+                        }, stoppingToken);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                AppLogger.Error("Servis ana döngüsünde beklenmeyen hata", ex);
+                AppLogger.Error("Servis ana döngüsünde hata", ex);
             }
 
-            // 15 saniye bekle
             try
             {
                 await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
@@ -89,53 +161,6 @@ public class KontrolBackgroundService : BackgroundService
             }
         }
         catch { }
-    }
-
-    private async Task CheckAndRunDepoStokTarihceAsync(DateTime now, CancellationToken stoppingToken)
-    {
-        if (!_config.DepoStokTarihce.Enabled) return;
-        if (_config.DepoStokTarihce.ExecutionTimes == null || _config.DepoStokTarihce.ExecutionTimes.Count == 0) return;
-
-        string currentHm = now.ToString("HH:mm");
-        string todayStr = now.ToString("yyyyMMdd");
-
-        // Dünden kalan eski kayıtları temizle
-        _executedDepoSlots.RemoveWhere(slot => !slot.StartsWith(todayStr));
-
-        foreach (var rawTime in _config.DepoStokTarihce.ExecutionTimes)
-        {
-            string targetTime = NormalizeTime(rawTime);
-            if (string.Equals(currentHm, targetTime, StringComparison.OrdinalIgnoreCase))
-            {
-                string slotKey = $"{todayStr}_{targetTime}";
-                if (!_executedDepoSlots.Contains(slotKey))
-                {
-                    _executedDepoSlots.Add(slotKey);
-                    AppLogger.Info($"[ZAMANLAMA] Depo Stok Tarihçe saati geldi ({targetTime}). Stored procedure tetikleniyor...");
-
-                    _ = Task.Run(async () =>
-                    {
-                        await _sqlService.ExecuteDepoStokTarihceAsync(CancellationToken.None);
-                    }, stoppingToken);
-                }
-            }
-        }
-    }
-
-    private async Task CheckAndRunSparisDurumKontrolAsync(DateTime now, CancellationToken stoppingToken)
-    {
-        if (!_config.SparisDurumKontrol.Enabled) return;
-
-        int intervalMinutes = Math.Max(1, _config.SparisDurumKontrol.IntervalMinutes);
-        var elapsed = now - _lastSparisExecutionTime;
-
-        if (elapsed.TotalMinutes >= intervalMinutes)
-        {
-            _lastSparisExecutionTime = now;
-            AppLogger.Info($"[PERİYODİK] Sipariş Durum Kontrol periyodu geldi ({intervalMinutes} dk aralık). Stored procedure tetikleniyor...");
-
-            await _sqlService.ExecuteSparisDurumKontrolAsync(stoppingToken);
-        }
     }
 
     private static string NormalizeTime(string timeStr)

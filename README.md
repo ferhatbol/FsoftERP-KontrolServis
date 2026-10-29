@@ -1,45 +1,34 @@
 # FsoftERP-KontrolServis (FsoftERPSKWS)
 
-FsoftERP için Depo Stok Tarihçe ve Sipariş Durum Kontrol işlemlerini otomatik olarak yürüten Windows Arka Plan Servisi ve Yönetim Paneli.
+FsoftERP için sınırsız sayıda **Stored Procedure** tanımlayabileceğiniz, her birine bağımsız çalışma periyodu veya saat planı atayabileceğiniz kurumsal Windows Arka Plan Servisi ve Görsel Yönetim Paneli.
 
-## 🚀 Özellikler
+## 🚀 Yeni Özellikler (v1.0.1.0)
 
-1. **📦 Depo Stok Tarihçe (`Sp_Set_DepoStokTarihce`):**
-   - Belirlenen saatlerde (Örn: Günde 2 kez saat 12:00 ve 19:00'da veya günde 3 kez 06:00, 12:00, 21:00'de) otomatik çalışır.
-   - Kolay saat ekleme/silme ve hazır şablonlar.
-   - Aktif / Pasif yapılabilir.
-   - Komut zaman aşımı (timeout) ayarlanabilir.
-   - Arayüzden tek tıkla test çalıştırılabilir.
+1. **⚡ Sınırsız Sayıda Stored Procedure Ekleme / Çıkarma:**
+   - İster `Sp_Set_DepoStokTarihce`, ister `Sp_Set_SparisDurumKontrol`, ister `Sp_Set_SatınalmaDurumKontrol`, ister kendi yazdığınız özel bir procedure olsun; dilediğiniz kadar SP ekleyebilir, silebilir, kopyalayabilir veya düzenleyebilirsiniz.
 
-2. **📋 Sipariş Durum Kontrol (`Sp_Set_SparisDurumKontrol`):**
-   - Belirlenen dakika aralıklarıyla (Örn: Her 3 dakikada bir) periyodik olarak çalışır.
-   - İsteğe bağlı `@SiparisNo` parametresi verilebilir (boş bırakıldığında `NULL` olarak tüm siparişler taranır).
-   - Aktif / Pasif yapılabilir.
-   - Komut zaman aşımı (timeout) ayarlanabilir.
-   - Arayüzden tek tıkla test çalıştırılabilir.
+2. **🕒 Esnek ve Bağımsız Çalışma Planı:**
+   - **Günde Belirtilen Saatlerde Çalıştırma:** Örn. günde 1 kez saat `12:00`'de, günde 2 kez `12:00` ve `19:00`'da, günde 3 kez `06:00, 12:00, 21:00`'de (dakika hassasiyetinde sınırsız saat listesi).
+   - **Periyodik Dakika Aralıklarında Çalıştırma:** Örn. her `3` dakikada bir, her `15` dakikada bir veya her `60` dakikada bir.
+   - Her görevin çalışma planı ve parametreleri tamamen birbirinden bağımsızdır.
 
-3. **🗄️ Veritabanı ve Güvenlik:**
-   - MSSQL Server bağlantı ayarları (Sunucu, Veritabanı, Windows Auth veya SQL Auth).
-   - Şifreler makineye özel **DPAPI (`ENC(...)`)** ile otomatik şifrelenir; açık metin olarak saklanmaz.
-   - Tek tıkla canlı bağlantı testi (gecikme süresi ve SQL versiyonu göstergesi).
+3. **⚙️ Bağımsız Eşzamanlı (Concurrent) Çalışma:**
+   - Görevler birbirini kilitlemez. 10 dakika süren ağır bir SP çalışırken, 3 dakikalık hızlı SP arka planda zamanı geldiğinde aksamadan yürütülür.
 
-4. **⚙️ Windows Servis Yönetimi & Canlı Log Konsolu:**
-   - Arayüz üzerinden tek tıkla Servisi Kur, Servisi Kaldır, Başlat ve Durdur.
-   - Gerçek zamanlı konsol çıktısı ve günlük dönen dosya loglama (`logs/service_yyyyMMdd.log`).
-   - Servis çalışırken ayarlar değiştirilip kaydedildiğinde servisi yeniden başlatmaya gerek kalmadan 30 saniye içinde yeni ayarları otomatik uygular.
+4. **🗄️ Parametre Desteği & Zaman Aşımı (Timeout):**
+   - Her procedure için parametre (`@SiparisNo = NULL`, vb.) ve komut zaman aşımı süresi tanımlanabilir.
 
-## 🛠️ Derleme ve Çalıştırma
+5. **🖥️ Windows Form Görsel Paneli (`FsoftERPSKWS.exe`):**
+   - Kod veya `appsettings.json` ile uğraşmadan tek ekranda tablo üzerinden yönetim.
+   - Kolay Görev Ekle / Düzenle / Sil / Klonla pencereleri.
+   - Tek tıkla veritabanı bağlantı testi ve SP'leri beklemeden anında test çalıştırma.
+   - Windows Servisi Kurma / Kaldırma / Başlatma / Durdurma butonları.
+   - Canlı log konsolu.
 
-### Gereksinimler
-- .NET 9.0 SDK veya .NET 8.0 SDK
-- Windows 10 / 11 veya Windows Server 2016+
+---
 
-### Derleme
-```powershell
-dotnet build -c Release
-```
+## 🛠️ Komut Satırı (CLI) Kullanımı
 
-### Kullanım Komutları
 | Komut | Açıklama |
 |---|---|
 | `FsoftERPSKWS.exe` | Görsel Yönetim ve Ayar Panelini açar (GUI) |
@@ -48,10 +37,10 @@ dotnet build -c Release
 | `FsoftERPSKWS.exe --uninstall` | Windows Servisini sistemden kaldırır |
 | `FsoftERPSKWS.exe --start` | Servisi başlatır |
 | `FsoftERPSKWS.exe --stop` | Servisi durdurur |
-| `FsoftERPSKWS.exe --run-depo` | `Sp_Set_DepoStokTarihce` işlemini hemen çalıştırır |
-| `FsoftERPSKWS.exe --run-siparis` | `Sp_Set_SparisDurumKontrol` işlemini hemen çalıştırır |
+| `FsoftERPSKWS.exe --run-all` | Aktif tüm Stored Procedure görevlerini hemen çalıştırır |
+| `FsoftERPSKWS.exe --run-sp=<SP_ADI>` | Belirtilen Stored Procedure'ü hemen çalıştırır |
 
 ---
-**Versiyon:** `1.0.0.1`  
+**Versiyon:** `1.0.1.0`  
 **Yazar:** Ferhat BOL  
 **Telif Hakkı:** © 2026 Fsoft. Tüm hakları saklıdır.
